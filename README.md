@@ -76,12 +76,13 @@ flowchart TD
 
 | Layer | Technologies |
 | :--- | :--- |
-| **Frontend & UI/UX** | **Streamlit (v1.30+)**, Custom CSS Modern Design System, Plotly interactive charts |
-| **Core Language** | **Python (3.10+)** with modular decoupled architecture |
-| **Database & Persistence** | **SQLite3** with relational schema (`companies`, `leads`, `enrichments`, `sequences`, `whatsapp`, `audit_logs`) |
-| **REST APIs & Integrations** | **HubSpot CRM API v3**, **WhatsApp Cloud API (Graph v19.0)**, Requests, Pydantic |
-| **DNS & Mail Verification** | Native Unix `dig` socket resolution, RFC 5322 Regex, RFC compliant MX query parser |
-| **AI & Neural Generation** | Contextual heuristic neural generator with zero-dependency instant startup + **OpenAI GPT-4o / Google Gemini / Claude** adapters |
+| **Frontend & UI/UX** | **Multi-Page HTML5, Enterprise CSS3 Design System, Vanilla ES6 JavaScript**, Chart.js interactive charts |
+| **Web Server & REST APIs** | **FastAPI & Uvicorn**, Pydantic validation, Swagger/OpenAPI docs (`/docs`), Meta WhatsApp Webhooks |
+| **Core Language** | **Python (3.10+)** with modular decoupled architecture (`core/`) |
+| **Database & Persistence** | **SQLite3** with 7-table relational schema (`companies`, `leads`, `contact_enrichments`, `outreach_sequences`, `whatsapp_conversations`, `hubspot_sync_log`, `audit_logs`) |
+| **External Integrations** | **HubSpot CRM API v3**, **WhatsApp Cloud API (Graph v19.0)**, Streaming CSV Export |
+| **DNS & Mail Verification** | Native Unix `dig` MX query parser, active DNS socket lookup, RFC 5322 Regex |
+| **AI & Neural Generation** | Contextual heuristic neural generator + **OpenAI GPT-4o / Google Gemini / Claude** adapters |
 
 ---
 
@@ -143,11 +144,13 @@ cd LeadPulse-AI
 pip install -r requirements.txt
 ```
 
-### 3. Launch the Application
+### 3. Launch the Application (HTML Web App + FastAPI Backend)
 ```bash
-streamlit run app.py
+python3 server.py
+# Or using Uvicorn directly:
+uvicorn server:app --host 0.0.0.0 --port 8000 --reload
 ```
-Open your browser at `http://localhost:8501`.
+Open your browser at `http://localhost:8000` (Swagger API docs available at `http://localhost:8000/docs`).
 
 ---
 
@@ -158,7 +161,19 @@ LeadPulse-AI/
 ├── README.md                      # Comprehensive enterprise documentation
 ├── requirements.txt               # Python package dependencies
 ├── .gitignore                     # Git ignore rules
-├── app.py                         # Unified Streamlit dashboard application
+├── server.py                      # FastAPI web server, REST APIs & Meta WhatsApp webhooks
+├── web/                           # Multi-page professional HTML/CSS/JS frontend
+│   ├── index.html                 # Executive KPI Dashboard (Chart.js)
+│   ├── discovery.html             # Market Research & Company Discovery
+│   ├── enrichment.html            # Contact Enrichment & 4-Tier DNS/MX Verifier
+│   ├── crm.html                   # Local CRM Pipeline, CSV Export & HubSpot Sync
+│   ├── sequences.html             # 3-Step Outreach Sequences & Human Approval Queue
+│   ├── whatsapp.html              # WhatsApp Phone Simulator & Live BANT Radar
+│   ├── copilot.html               # Sales Copilot & 360° Prospect Dossiers
+│   ├── architecture.html          # Architecture Overview & Live Webhook Handshake Tester
+│   └── static/
+│       ├── css/styles.css         # Enterprise SaaS Design System
+│       └── js/common.js           # Shared Sidebar, Toasts & Badges
 ├── core/
 │   ├── __init__.py
 │   ├── config.py                  # Environment config, API credentials, paths
@@ -170,8 +185,6 @@ LeadPulse-AI/
 │   ├── hubspot_adapter.py         # HubSpot REST API sync adapter
 │   ├── sales_copilot.py           # Prospect dossiers & KPI metrics
 │   └── llm_engine.py              # LLM integration & contextual neural generator
-├── assets/
-│   └── style.css                  # Modern corporate design system styling
 └── data/
     └── leadpulse.db               # Pre-seeded SQLite database with realistic B2B data
 ```

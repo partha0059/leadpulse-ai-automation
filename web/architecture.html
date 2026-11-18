@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Architecture & Webhooks — LeadPulse AI</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <aside id="sidebar" class="sidebar"></aside>
+
+    <div class="main-wrapper">
+        <header class="topbar">
+            <div class="topbar-left">
+                <h2>System Architecture, REST APIs & Webhooks</h2>
+                <p>Modular Python architecture, SQLite relational schema, HubSpot v3 adapter & Meta WhatsApp webhooks</p>
+            </div>
+            <div class="topbar-right">
+                <a href="/docs" target="_blank" class="btn btn-primary">📘 Open FastAPI Swagger Docs</a>
+            </div>
+        </header>
+
+        <main class="content">
+            <!-- Visual Pipeline Architecture -->
+            <section class="card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">Unified Lead-Lifecycle System Architecture</div>
+                        <div class="card-subtitle">Decoupled multi-layer design connecting Discovery ➔ Enrichment ➔ CRM ➔ Outreach ➔ WhatsApp ➔ Copilot</div>
+                    </div>
+                </div>
+
+                <div class="arch-flow">
+                    <div class="arch-node">
+                        <h4>1. Market Discovery</h4>
+                        <ul>
+                            <li>• Firmographic Catalog Filter</li>
+                            <li>• Hiring & Funding Signals</li>
+                            <li>• Tech Stack Profiling</li>
+                            <li>• ICP Priority Scoring</li>
+                        </ul>
+                    </div>
+                    <div class="arch-node" style="border-top-color:#4f46e5;">
+                        <h4>2. Contact Enrichment</h4>
+                        <ul>
+                            <li>• Corporate Pattern Predictor</li>
+                            <li>• RFC 5322 Syntax Check</li>
+                            <li>• Active Domain DNS Lookup</li>
+                            <li>• MX Mail Server & Dedup</li>
+                        </ul>
+                    </div>
+                    <div class="arch-node" style="border-top-color:#0284c7;">
+                        <h4>3. Local CRM & Sync</h4>
+                        <ul>
+                            <li>• 7-Table SQLite Schema</li>
+                            <li>• HubSpot CRM v3 Adapter</li>
+                            <li>• Custom Property Mapping</li>
+                            <li>• Streaming CSV Exporter</li>
+                        </ul>
+                    </div>
+                    <div class="arch-node" style="border-top-color:#d97706;">
+                        <h4>4. Outreach Governance</h4>
+                        <ul>
+                            <li>• 3-Step LLM Sequence Drafts</li>
+                            <li>• Human Approval Queue</li>
+                            <li>• Inline Editing & Notes</li>
+                            <li>• Audit Log Traceability</li>
+                        </ul>
+                    </div>
+                    <div class="arch-node" style="border-top-color:#10b981;">
+                        <h4>5. WhatsApp Cloud Suite</h4>
+                        <ul>
+                            <li>• Meta Webhook Receiver</li>
+                            <li>• Intent & BANT Extraction</li>
+                            <li>• Hot / Warm / Cold Tagging</li>
+                            <li>• Handover & STOP Opt-Out</li>
+                        </ul>
+                    </div>
+                    <div class="arch-node" style="border-top-color:#e11d48;">
+                        <h4>6. Sales Copilot & KPIs</h4>
+                        <ul>
+                            <li>• 360° Prospect Dossiers</li>
+                            <li>• Objection Playbooks</li>
+                            <li>• Next Best Actions (NBA)</li>
+                            <li>• Interactive Revenue Charts</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Live Webhook Verification Tester & Active Integrations -->
+            <section class="grid-2">
+                <div class="card" style="margin-bottom:0;">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Live Meta Webhook Handshake Tester</div>
+                            <div class="card-subtitle">Test the live <code>GET /webhooks/whatsapp</code> challenge verification route</div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Verify Token</label>
+                        <input id="wh-token" class="form-control mono" value="leadpulse_webhook_secure_token_2026">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Challenge String</label>
+                        <input id="wh-challenge" class="form-control mono" value="meta_challenge_99812">
+                    </div>
+                    <button class="btn btn-primary" onclick="testWebhook()">🔐 Test Webhook Verification</button>
+
+                    <div id="wh-result" style="margin-top:14px;"></div>
+                </div>
+
+                <div class="card" style="margin-bottom:0;">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Active System Integrations</div>
+                            <div class="card-subtitle">Live runtime status from <code>GET /api/config</code></div>
+                        </div>
+                    </div>
+                    <div id="integration-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="/static/js/common.js"></script>
+    <script>
+        renderSidebar("/architecture");
+
+        async function loadConfig() {
+            const res = await fetch("/api/config");
+            const data = await res.json();
+            document.getElementById("wh-token").value = data.whatsapp.verify_token;
+
+            const integ = data.integrations;
+            document.getElementById("integration-list").innerHTML = `
+                <div class="check-item">✅ <span><strong>Database:</strong> ${escapeHtml(integ.sqlite)}</span></div>
+                <div class="check-item">✅ <span><strong>HubSpot CRM Adapter:</strong> ${escapeHtml(integ.hubspot)}</span></div>
+                <div class="check-item">✅ <span><strong>AI / LLM Engine:</strong> ${escapeHtml(integ.llm)}</span></div>
+                <div class="check-item">✅ <span><strong>WhatsApp Webhook:</strong> ${escapeHtml(integ.whatsapp_webhook)}</span></div>
+                <div class="check-item">📘 <span><strong>Interactive OpenAPI Docs:</strong> <a href="/docs" target="_blank" style="color:#0d9488;font-weight:600;">/docs (Swagger UI)</a></span></div>
+            `;
+        }
+
+        async function testWebhook() {
+            const token = encodeURIComponent(document.getElementById("wh-token").value);
+            const challenge = encodeURIComponent(document.getElementById("wh-challenge").value);
+            const res = await fetch(`/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=${token}&hub.challenge=${challenge}`);
+            const text = await res.text();
+            const box = document.getElementById("wh-result");
+            if (res.ok) {
+                box.innerHTML = `<div class="badge badge-approved">✅ HTTP 200 OK — Returned Challenge: ${escapeHtml(text)}</div>`;
+                showToast("Meta webhook verification handshake succeeded!");
+            } else {
+                box.innerHTML = `<div class="badge badge-rejected">❌ HTTP ${res.status} — ${escapeHtml(text)}</div>`;
+                showToast("Webhook verification rejected (invalid token)", true);
+            }
+        }
+
+        loadConfig();
+    </script>
+</body>
+</html>

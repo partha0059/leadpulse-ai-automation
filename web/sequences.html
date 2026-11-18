@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Outreach Sequences & Human Approval Queue — LeadPulse AI</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <aside id="sidebar" class="sidebar"></aside>
+
+    <div class="main-wrapper">
+        <header class="topbar">
+            <div class="topbar-left">
+                <h2>3-Step Outreach & Human Approval Queue</h2>
+                <p>AI-personalized multi-touch sequences (Hook ➔ Case Study ➔ Breakup) with human-in-the-loop governance</p>
+            </div>
+            <div class="topbar-right">
+                <span class="pill-live"><span class="dot"></span>Human Governance Active</span>
+            </div>
+        </header>
+
+        <main class="content">
+            <!-- Generate New Sequence Bar -->
+            <section class="card">
+                <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;">
+                    <div class="form-group" style="flex:1;min-width:260px;margin-bottom:0;">
+                        <label class="form-label">Generate Personalized 3-Step Sequence for Any Prospect</label>
+                        <select id="gen-lead-select" class="form-control"></select>
+                    </div>
+                    <button class="btn btn-primary" onclick="generateSequence()">✨ Generate 3-Step AI Sequence</button>
+                    <div class="form-group" style="min-width:190px;margin-bottom:0;">
+                        <label class="form-label">Queue Filter</label>
+                        <select id="queue-filter" class="form-control" onchange="loadSequences()">
+                            <option value="Pending Review">⏳ Pending Review</option>
+                            <option value="Approved">✅ Approved</option>
+                            <option value="Rejected">❌ Rejected</option>
+                            <option value="All Statuses">All Statuses</option>
+                        </select>
+                    </div>
+                </div>
+            </section>
+
+            <div style="margin-bottom:14px;font-size:13.5px;font-weight:600;color:#475569;" id="queue-summary">Loading queue...</div>
+
+            <!-- Queue List -->
+            <section id="queue-list"></section>
+        </main>
+    </div>
+
+    <script src="/static/js/common.js"></script>
+    <script>
+        renderSidebar("/sequences");
+
+        async function loadLeadDropdown() {
+            const res = await fetch("/api/crm/leads");
+            const data = await res.json();
+            const sel = document.getElementById("gen-lead-select");
+            sel.innerHTML = data.leads.map(l =>
+                `<option value="${l.id}">${escapeHtml(l.first_name)} ${escapeHtml(l.last_name)} — ${escapeHtml(l.title)} (${escapeHtml(l.company_name || "N/A")})</option>`
+            ).join("");
+        }
+
+        async function loadSequences() {
+            const status = encodeURIComponent(document.getElementById("queue-filter").value);
+            const res = await fetch(`/api/sequences?status=${status}`);
+            const data = await res.json();
+
+            document.getElementById("queue-summary").textContent = `${data.count} email draft(s) in "${document.getElementById("queue-filter").value}"`;
+            const list = document.getElementById("queue-list");
+
+            if (!data.sequences.length) {
+                list.innerHTML = `<div class="card"><p style="color:#64748b;">No outreach drafts in this queue filter. Select a prospect above to generate a 3-step AI sequence.</p></div>`;
+                return;
+            }
+
+            list.innerHTML = data.sequences.map(s => {
+                const stepLabels = { 1: "Step 1 • Personalized Cold Hook (Day 0)", 2: "Step 2 • Value Proof & Case Study (+3 Days)", 3: "Step 3 • Polite Breakup (+7 Days)" };
+                const cls = s.status === "Approved" ? "status-approved" : (s.status === "Rejected" ? "status-rejected" : "status-pending");
+
+                return `
+                    <div class="sequence-card ${cls}">
+                        <div class="sequence-meta">
+                            <div>
+                                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                                    <span class="badge badge-info">${stepLabels[s.step_number] || "Step " + s.step_number}</span>
+                                    ${statusBadge(s.status)}
+                                    <span style="font-size:12px;color:#64748b;">Scheduled: ${escapeHtml(s.scheduled_at || "Upon Approval")}</span>
+                                </div>
+                                <div style="font-size:13px;color:#334155;margin-top:6px;">
+                                    <strong>To:</strong> ${escapeHtml(s.first_name)} ${escapeHtml(s.last_name)} (${escapeHtml(s.title)}) at <strong>${escapeHtml(s.company_name || "")}</strong> • <span class="mono" style="font-size:12px;">${escapeHtml(s.email)}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Email Subject</label>
+                            <input type="text" id="sub-${s.id}" class="form-control" value="${escapeHtml(s.subject)}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Personalized Email Body (Editable before approval)</label>
+                            <textarea id="body-${s.id}" class="form-control" rows="6">${escapeHtml(s.body)}</textarea>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Manager Review Notes</label>
+                            <input type="text" id="notes-${s.id}" class="form-control" value="${escapeHtml(s.review_notes || "")}" placeholder="Optional approval or rejection notes...">
+                        </div>
+
+                        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                            <button class="btn btn-primary" onclick="reviewSequence(${s.id}, 'Approved')">✅ Approve & Schedule Send</button>
+                            <button class="btn btn-danger" onclick="reviewSequence(${s.id}, 'Rejected')">❌ Reject Draft</button>
+                        </div>
+                    </div>
+                `;
+            }).join("");
+        }
+
+        async function reviewSequence(id, status) {
+            const payload = {
+                status,
+                subject: document.getElementById(`sub-${id}`).value,
+                body: document.getElementById(`body-${id}`).value,
+                review_notes: document.getElementById(`notes-${id}`).value
+            };
+            const res = await fetch(`/api/sequences/${id}/review`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+                showToast(`Sequence draft #${id} marked as ${status}`);
+                loadSequences();
+            } else {
+                showToast("Failed to update draft", true);
+            }
+        }
+
+        async function generateSequence() {
+            const leadId = document.getElementById("gen-lead-select").value;
+            const res = await fetch(`/api/sequences/generate/${leadId}`, { method: "POST" });
+            const data = await res.json();
+            if (data.created_count > 0) {
+                showToast(`Generated ${data.created_count} personalized sequence step(s) into Approval Queue!`);
+            } else {
+                showToast("All 3 sequence steps already exist for this prospect.");
+            }
+            document.getElementById("queue-filter").value = "Pending Review";
+            loadSequences();
+        }
+
+        loadLeadDropdown();
+        loadSequences();
+    </script>
+</body>
+</html>

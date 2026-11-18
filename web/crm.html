@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM Pipeline & HubSpot Sync — LeadPulse AI</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <aside id="sidebar" class="sidebar"></aside>
+
+    <div class="main-wrapper">
+        <header class="topbar">
+            <div class="topbar-left">
+                <h2>Local CRM Pipeline & HubSpot Adapter</h2>
+                <p>SQLite relational lead repository with bi-directional HubSpot CRM v3 sync and CSV portability</p>
+            </div>
+            <div class="topbar-right">
+                <a href="/api/crm/export" class="btn btn-secondary">📥 Export CSV</a>
+                <button class="btn btn-primary" onclick="openAddModal()">+ Add New Lead</button>
+            </div>
+        </header>
+
+        <main class="content">
+            <!-- Filter Controls -->
+            <section class="card">
+                <div class="form-grid" style="margin-bottom:0;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">Search Prospects</label>
+                        <input type="text" id="crm-q" class="form-control" placeholder="Name, company, email, title...">
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">Lead Temperature</label>
+                        <select id="crm-temp" class="form-control">
+                            <option value="All">All Temperatures</option>
+                            <option value="Hot">🔥 Hot</option>
+                            <option value="Warm">🟡 Warm</option>
+                            <option value="Cold">❄️ Cold</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">Lifecycle Stage</label>
+                        <select id="crm-status" class="form-control">
+                            <option value="All">All Stages</option>
+                            <option value="New">New</option>
+                            <option value="Enriched">Enriched</option>
+                            <option value="Contacted">Contacted</option>
+                            <option value="Qualified">Qualified</option>
+                            <option value="Closed-Won">Closed-Won</option>
+                            <option value="Closed-Lost">Closed-Lost</option>
+                        </select>
+                    </div>
+                </div>
+            </section>
+
+            <!-- CRM Table -->
+            <section class="card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">Unified Prospect Directory (<span id="lead-count">0</span>)</div>
+                        <div class="card-subtitle">Click HubSpot Sync to push contact & custom BANT properties via REST API adapter</div>
+                    </div>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Prospect</th>
+                                <th>Company</th>
+                                <th>Contact</th>
+                                <th>Stage</th>
+                                <th>Temperature</th>
+                                <th>BANT / Score</th>
+                                <th>HubSpot ID</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="crm-body">
+                            <tr><td colspan="8" style="text-align:center;color:#64748b;">Loading CRM records...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- HubSpot Sync Payload Preview & Audit Log -->
+            <section class="card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">HubSpot CRM v3 Synchronization Telemetry</div>
+                        <div class="card-subtitle">Audit ledger of all contact, company, and deal sync operations</div>
+                    </div>
+                </div>
+                <div id="last-payload-box" style="display:none;margin-bottom:16px;">
+                    <div style="font-size:12px;font-weight:600;color:#0f766e;margin-bottom:6px;">Latest Synced HubSpot REST Payload:</div>
+                    <pre id="last-payload-json" class="code-block"></pre>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Synced At</th>
+                                <th>Entity</th>
+                                <th>HubSpot Record ID</th>
+                                <th>Status</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody id="hs-logs-body"></tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Add New Lead Modal -->
+    <div id="add-modal" class="modal-backdrop">
+        <div class="modal">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+                <h3>Add Prospect to Local CRM</h3>
+                <button class="btn btn-secondary btn-sm" onclick="closeAddModal()">✕</button>
+            </div>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label class="form-label">First Name *</label>
+                    <input id="new-fn" class="form-control" placeholder="e.g. Priya">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Last Name *</label>
+                    <input id="new-ln" class="form-control" placeholder="e.g. Nair">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Job Title *</label>
+                <input id="new-title" class="form-control" placeholder="e.g. VP of Engineering">
+            </div>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label class="form-label">Corporate Email *</label>
+                    <input id="new-email" type="email" class="form-control" placeholder="priya.nair@acme.io">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Phone / WhatsApp</label>
+                    <input id="new-phone" class="form-control" placeholder="+1 (415) 555-0140">
+                </div>
+            </div>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label class="form-label">Company Name *</label>
+                    <input id="new-comp" class="form-control" placeholder="e.g. Acme Cloud Systems">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Industry</label>
+                    <input id="new-ind" class="form-control" value="Enterprise SaaS">
+                </div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
+                <button class="btn btn-secondary" onclick="closeAddModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="submitNewLead()">Save to SQLite CRM</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/common.js"></script>
+    <script>
+        renderSidebar("/crm");
+
+        function openAddModal() { document.getElementById("add-modal").classList.add("open"); }
+        function closeAddModal() { document.getElementById("add-modal").classList.remove("open"); }
+
+        async function loadLeads() {
+            const q = encodeURIComponent(document.getElementById("crm-q").value);
+            const temp = encodeURIComponent(document.getElementById("crm-temp").value);
+            const status = encodeURIComponent(document.getElementById("crm-status").value);
+
+            const res = await fetch(`/api/crm/leads?q=${q}&temperature=${temp}&status=${status}`);
+            const data = await res.json();
+
+            document.getElementById("lead-count").textContent = data.count;
+            const tbody = document.getElementById("crm-body");
+
+            if (!data.leads.length) {
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#64748b;">No leads match your filters.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = data.leads.map(l => `
+                <tr>
+                    <td>
+                        <div style="font-weight:600;">${escapeHtml(l.first_name)} ${escapeHtml(l.last_name)}</div>
+                        <div style="font-size:11.5px;color:#64748b;">${escapeHtml(l.title)}</div>
+                    </td>
+                    <td>
+                        <div style="font-weight:500;">${escapeHtml(l.company_name || "—")}</div>
+                        <div style="font-size:11px;color:#64748b;">${escapeHtml(l.industry || "")}</div>
+                    </td>
+                    <td>
+                        <div class="mono" style="font-size:11.5px;">${escapeHtml(l.email)}</div>
+                        <div style="font-size:11px;color:#64748b;">${escapeHtml(l.phone || "No phone")}</div>
+                    </td>
+                    <td>${statusBadge(l.status)}</td>
+                    <td>${tempBadge(l.temperature)}</td>
+                    <td><strong>${l.bant_score}</strong> BANT / <strong>${l.lead_score}</strong> ICP</td>
+                    <td>${l.hubspot_id ? `<span class="tech-pill">${escapeHtml(l.hubspot_id)}</span>` : `<span style="color:#94a3b8;font-size:12px;">Not synced</span>`}</td>
+                    <td>
+                        <div style="display:flex;gap:6px;">
+                            <button class="btn btn-primary btn-sm" onclick="syncHubSpot(${l.id})">🚀 HubSpot</button>
+                            <a href="/copilot?lead_id=${l.id}" class="btn btn-secondary btn-sm">🤖 Dossier</a>
+                        </div>
+                    </td>
+                </tr>
+            `).join("");
+        }
+
+        async function syncHubSpot(leadId) {
+            try {
+                const res = await fetch(`/api/hubspot/sync/${leadId}`, { method: "POST" });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`Synced to HubSpot! Record ID: ${data.hubspot_id}`);
+                    document.getElementById("last-payload-box").style.display = "block";
+                    document.getElementById("last-payload-json").textContent = JSON.stringify(data, null, 2);
+                    loadLeads();
+                    loadHubSpotLogs();
+                } else {
+                    showToast(`HubSpot sync failed: ${data.error}`, true);
+                }
+            } catch (e) {
+                showToast("HubSpot API error", true);
+            }
+        }
+
+        async function loadHubSpotLogs() {
+            const res = await fetch("/api/hubspot/logs");
+            const data = await res.json();
+            document.getElementById("hs-logs-body").innerHTML = data.logs.map(log => `
+                <tr>
+                    <td style="font-size:12px;color:#64748b;">${escapeHtml(log.synced_at)}</td>
+                    <td><span class="badge badge-info">${escapeHtml(log.entity_type)} #${log.entity_id}</span></td>
+                    <td class="mono" style="font-size:12px;">${escapeHtml(log.hubspot_id || "—")}</td>
+                    <td>${statusBadge(log.sync_status)}</td>
+                    <td style="font-size:12.5px;color:#334155;">${escapeHtml(log.details || log.error_message || "")}</td>
+                </tr>
+            `).join("");
+        }
+
+        async function submitNewLead() {
+            const payload = {
+                first_name: document.getElementById("new-fn").value.trim(),
+                last_name: document.getElementById("new-ln").value.trim(),
+                title: document.getElementById("new-title").value.trim(),
+                email: document.getElementById("new-email").value.trim(),
+                phone: document.getElementById("new-phone").value.trim(),
+                company_name: document.getElementById("new-comp").value.trim(),
+                industry: document.getElementById("new-ind").value.trim()
+            };
+            if (!payload.first_name || !payload.email || !payload.company_name) {
+                return showToast("Please complete required fields (*)", true);
+            }
+            const res = await fetch("/api/crm/leads", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+                showToast(`Added ${payload.first_name} ${payload.last_name} to SQLite CRM`);
+                closeAddModal();
+                loadLeads();
+            } else {
+                const err = await res.json();
+                showToast(err.detail || "Failed to save lead", true);
+            }
+        }
+
+        document.getElementById("crm-q").addEventListener("input", loadLeads);
+        document.getElementById("crm-temp").addEventListener("change", loadLeads);
+        document.getElementById("crm-status").addEventListener("change", loadLeads);
+
+        loadLeads();
+        loadHubSpotLogs();
+    </script>
+</body>
+</html>

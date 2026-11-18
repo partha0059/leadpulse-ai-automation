@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Cloud Suite & BANT Simulator — LeadPulse AI</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <aside id="sidebar" class="sidebar"></aside>
+
+    <div class="main-wrapper">
+        <header class="topbar">
+            <div class="topbar-left">
+                <h2>WhatsApp Cloud API & BANT Qualification</h2>
+                <p>Inbound intent recognition, automated BANT scoring, temperature tagging, human handover & STOP opt-out compliance</p>
+            </div>
+            <div class="topbar-right">
+                <span class="pill-live"><span class="dot"></span>Meta Graph v19.0 Webhook</span>
+            </div>
+        </header>
+
+        <main class="content">
+            <section class="grid-split">
+                <!-- Interactive WhatsApp Phone Simulator -->
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Interactive WhatsApp Inbound Simulator</div>
+                            <div class="card-subtitle">Select a prospect and send messages to watch real-time BANT qualification</div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Active Prospect Thread</label>
+                        <select id="wa-contact-select" class="form-control" onchange="loadMessages()"></select>
+                    </div>
+
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+                        <span style="font-size:11.5px;color:#64748b;align-self:center;">Quick Scenarios:</span>
+                        <button class="btn btn-secondary btn-sm" onclick="sendPreset('I lead engineering and we have $45k budget approved for this urgent bottleneck. Can someone call me tomorrow?')">🔥 Hot BANT + Handover</button>
+                        <button class="btn btn-secondary btn-sm" onclick="sendPreset('Does your platform integrate with Snowflake and HubSpot via webhooks?')">🔧 Technical Question</button>
+                        <button class="btn btn-danger btn-sm" onclick="sendPreset('STOP')">🛑 Test Opt-Out (STOP)</button>
+                    </div>
+
+                    <div class="wa-phone">
+                        <div class="wa-header">
+                            <div class="wa-header-info">
+                                <div class="wa-avatar" id="wa-avatar">MV</div>
+                                <div>
+                                    <div style="font-weight:700;font-size:14px;" id="wa-active-name">Loading...</div>
+                                    <div style="font-size:11px;opacity:0.85;" id="wa-active-phone">+1 ...</div>
+                                </div>
+                            </div>
+                            <span style="font-size:11px;background:rgba(255,255,255,0.18);padding:3px 9px;border-radius:12px;">WhatsApp Business</span>
+                        </div>
+
+                        <div class="wa-messages" id="wa-messages"></div>
+
+                        <div class="wa-input-bar">
+                            <input type="text" id="wa-input" placeholder="Type a simulated inbound customer message..." onkeydown="if(event.key==='Enter') sendMessage()">
+                            <button class="btn btn-primary btn-sm" onclick="sendMessage()">Send ➤</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Live BANT Qualification Radar & Webhook Config -->
+                <div style="display:flex;flex-direction:column;gap:20px;">
+                    <div class="card" style="margin-bottom:0;">
+                        <div class="card-header">
+                            <div>
+                                <div class="card-title">Live BANT Qualification Radar</div>
+                                <div class="card-subtitle">Real-time entity extraction & lead temperature updates</div>
+                            </div>
+                            <div id="bant-temp-badge"></div>
+                        </div>
+
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                            <span style="font-size:12.5px;font-weight:600;color:#475569;">BANT Qualification Score</span>
+                            <strong id="bant-score-text" style="font-size:16px;color:#0d9488;">0/100</strong>
+                        </div>
+                        <div class="progress-bar-wrap" style="margin-bottom:16px;">
+                            <div id="bant-score-bar" class="progress-bar-fill" style="width:0%;"></div>
+                        </div>
+
+                        <div id="bant-details" style="display:flex;flex-direction:column;gap:10px;font-size:13px;">
+                            <p style="color:#64748b;">Select a thread or send a message to view live BANT telemetry.</p>
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin-bottom:0;">
+                        <div class="card-header">
+                            <div>
+                                <div class="card-title">Meta WhatsApp Webhook Endpoint</div>
+                                <div class="card-subtitle">Live FastAPI endpoint supporting Meta challenge verification</div>
+                            </div>
+                        </div>
+                        <pre class="code-block" id="wa-webhook-code">Loading configuration...</pre>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="/static/js/common.js"></script>
+    <script>
+        renderSidebar("/whatsapp");
+        let contactsList = [];
+
+        async function initWhatsApp() {
+            const [tRes, cRes] = await Promise.all([
+                fetch("/api/whatsapp/threads"),
+                fetch("/api/config")
+            ]);
+            const tData = await tRes.json();
+            const cData = await cRes.json();
+
+            contactsList = tData.contacts;
+            const sel = document.getElementById("wa-contact-select");
+            sel.innerHTML = contactsList.map(c =>
+                `<option value="${c.id}" data-phone="${escapeHtml(c.phone)}">${escapeHtml(c.first_name)} ${escapeHtml(c.last_name)} (${escapeHtml(c.company_name || "")}) — ${escapeHtml(c.phone)}</option>`
+            ).join("");
+
+            const wa = cData.whatsapp;
+            document.getElementById("wa-webhook-code").textContent =
+`# Live Meta Cloud API Webhook Routes
+GET  ${wa.webhook_url}?hub.mode=subscribe&hub.verify_token=${wa.verify_token}&hub.challenge=1234
+POST ${wa.webhook_url}
+
+Phone Number ID : ${wa.phone_number_id}
+WABA ID         : ${wa.waba_id}
+Graph API       : ${wa.api_version}`;
+
+            if (contactsList.length) loadMessages();
+        }
+
+        function getSelectedContact() {
+            const sel = document.getElementById("wa-contact-select");
+            const id = Number(sel.value);
+            return contactsList.find(c => c.id === id);
+        }
+
+        async function loadMessages() {
+            const contact = getSelectedContact();
+            if (!contact) return;
+
+            document.getElementById("wa-active-name").textContent = `${contact.first_name} ${contact.last_name}`;
+            document.getElementById("wa-active-phone").textContent = `${contact.phone} • ${contact.company_name || ""}`;
+            document.getElementById("wa-avatar").textContent = `${(contact.first_name || "?")[0]}${(contact.last_name || "?")[0]}`.toUpperCase();
+
+            const res = await fetch(`/api/whatsapp/messages?phone=${encodeURIComponent(contact.phone)}`);
+            const data = await res.json();
+
+            const box = document.getElementById("wa-messages");
+            if (!data.messages.length) {
+                box.innerHTML = `<div style="text-align:center;color:#64748b;font-size:12.5px;margin-top:40px;">No WhatsApp messages yet for this contact.<br>Use a quick scenario button above or type below!</div>`;
+            } else {
+                box.innerHTML = data.messages.map(m => {
+                    const alertHtml = (m.role === "assistant" && m.handover_requested)
+                        ? `<div class="wa-alert">🚨 HUMAN HANDOVER ESCALATED TO SENIOR REP</div>`
+                        : "";
+                    return `
+                        <div class="wa-bubble ${m.role}">
+                            <div>${escapeHtml(m.message)}</div>
+                            <div class="wa-bubble-meta">
+                                <span>${m.role === "user" ? "Prospect" : "LeadPulse AI"}</span>
+                                ${m.intent ? `<span>• ${escapeHtml(m.intent)}</span>` : ""}
+                            </div>
+                        </div>
+                        ${alertHtml}
+                    `;
+                }).join("");
+                box.scrollTop = box.scrollHeight;
+            }
+
+            // Update BANT Radar from latest message
+            const latest = data.messages.length ? data.messages[data.messages.length - 1] : null;
+            updateBantPanel(contact, latest);
+        }
+
+        function updateBantPanel(contact, latest) {
+            const score = contact.bant_score || 0;
+            document.getElementById("bant-temp-badge").innerHTML = tempBadge(contact.temperature);
+            document.getElementById("bant-score-text").textContent = `${score}/100`;
+            document.getElementById("bant-score-bar").style.width = `${score}%`;
+
+            if (!latest) {
+                document.getElementById("bant-details").innerHTML = `<p style="color:#64748b;">Send a message to extract live BANT fields.</p>`;
+                return;
+            }
+
+            document.getElementById("bant-details").innerHTML = `
+                <div class="check-item">🎯 <span><strong>Detected Intent:</strong> <span class="badge badge-info">${escapeHtml(latest.intent || "General")}</span></span></div>
+                <div class="check-item">💵 <span><strong>Budget (B):</strong> ${escapeHtml(latest.bant_budget || "Unverified")}</span></div>
+                <div class="check-item">👔 <span><strong>Authority (A):</strong> ${escapeHtml(latest.bant_authority || "Prospect")}</span></div>
+                <div class="check-item">⚡ <span><strong>Need (N):</strong> ${escapeHtml(latest.bant_need || "Moderate")}</span></div>
+                <div class="check-item">📅 <span><strong>Timeline (T):</strong> ${escapeHtml(latest.bant_timeline || "Evaluating")}</span></div>
+                <div class="check-item">${latest.handover_requested ? "🚨" : "🤖"} <span><strong>Routing:</strong> ${latest.handover_requested ? "<strong style='color:#dc2626;'>Human Handover Escalated</strong>" : "Autonomous AI Bot"}</span></div>
+                <div class="check-item">${latest.is_opt_out ? "🛑" : "✅"} <span><strong>Compliance:</strong> ${latest.is_opt_out ? "<strong style='color:#dc2626;'>Opted Out (STOP Honored)</strong>" : "Active Opt-In"}</span></div>
+            `;
+        }
+
+        function sendPreset(text) {
+            document.getElementById("wa-input").value = text;
+            sendMessage();
+        }
+
+        async function sendMessage() {
+            const contact = getSelectedContact();
+            const input = document.getElementById("wa-input");
+            const message = input.value.trim();
+            if (!contact || !message) return;
+
+            input.value = "";
+            const res = await fetch("/api/whatsapp/simulate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    phone_number: contact.phone,
+                    message,
+                    lead_id: contact.id
+                })
+            });
+            const data = await res.json();
+
+            // Update local contact cache
+            if (data.temperature) contact.temperature = data.temperature;
+            if (data.bant_score !== undefined) contact.bant_score = data.bant_score;
+
+            if (data.is_opt_out) {
+                showToast("Opt-Out processed: Lead marked unsubscribed & Closed-Lost", true);
+            } else if (data.handover_requested) {
+                showToast("High-intent buyer detected! Human Handover triggered.");
+            } else {
+                showToast(`Classified as ${data.intent} (${data.temperature} Lead)`);
+            }
+
+            loadMessages();
+        }
+
+        initWhatsApp();
+    </script>
+</body>
+</html>

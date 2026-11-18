@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Market Discovery — LeadPulse AI</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <aside id="sidebar" class="sidebar"></aside>
+
+    <div class="main-wrapper">
+        <header class="topbar">
+            <div class="topbar-left">
+                <h2>Market Research & Company Discovery</h2>
+                <p>Discover high-fit B2B accounts with funding momentum, hiring signals, and tech-stack footprints</p>
+            </div>
+            <div class="topbar-right">
+                <a href="/crm" class="btn btn-secondary">View CRM Pipeline →</a>
+            </div>
+        </header>
+
+        <main class="content">
+            <!-- Filters Card -->
+            <section class="card">
+                <div class="form-grid" style="margin-bottom:0;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">Industry Vertical</label>
+                        <select id="filter-industry" class="form-control">
+                            <option value="All Industries">All Industries</option>
+                            <option value="Data Infrastructure">Data Infrastructure</option>
+                            <option value="HealthTech & MedDevice">HealthTech & MedDevice</option>
+                            <option value="FinTech & Payments">FinTech & Payments</option>
+                            <option value="Cybersecurity">Cybersecurity</option>
+                            <option value="Supply Chain & SaaS">Supply Chain & SaaS</option>
+                            <option value="Algorithmic Trading & AI">Algorithmic Trading & AI</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">Company Size</label>
+                        <select id="filter-size" class="form-control">
+                            <option value="All Sizes">All Sizes</option>
+                            <option value="25-50">25-50 employees</option>
+                            <option value="50-100">50-100 employees</option>
+                            <option value="100-250">100-250 employees</option>
+                            <option value="250-500">250-500 employees</option>
+                            <option value="500-1000">500-1000 employees</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">Keyword / Tech Stack / Signal</label>
+                        <input type="text" id="filter-query" class="form-control" placeholder="e.g. Snowflake, Series B, AWS, GCP...">
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;justify-content:flex-end;">
+                        <button class="btn btn-primary" onclick="loadDiscovery()">🔍 Search Accounts</button>
+                    </div>
+                </div>
+            </section>
+
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                <span id="result-count" style="font-size:13.5px;font-weight:600;color:#475569;">Loading accounts...</span>
+            </div>
+
+            <!-- Discovered Companies Grid -->
+            <section id="companies-grid" class="grid-2"></section>
+        </main>
+    </div>
+
+    <script src="/static/js/common.js"></script>
+    <script>
+        renderSidebar("/discovery");
+
+        async function loadDiscovery() {
+            const industry = encodeURIComponent(document.getElementById("filter-industry").value);
+            const size = encodeURIComponent(document.getElementById("filter-size").value);
+            const q = encodeURIComponent(document.getElementById("filter-query").value);
+
+            const res = await fetch(`/api/discovery?industry=${industry}&size=${size}&q=${q}`);
+            const data = await res.json();
+
+            document.getElementById("result-count").textContent = `Showing ${data.count} high-intent B2B account(s)`;
+            const grid = document.getElementById("companies-grid");
+
+            if (!data.companies.length) {
+                grid.innerHTML = `<div class="card"><p style="color:#64748b;">No matching accounts found for the selected criteria. Try broadening your filters.</p></div>`;
+                return;
+            }
+
+            grid.innerHTML = data.companies.map(c => {
+                const techPills = c.tech_stack.split(",").map(t => `<span class="tech-pill">${escapeHtml(t.trim())}</span>`).join("");
+                const contacts = (c.sample_contacts || []).map(p => `${escapeHtml(p.first_name)} ${escapeHtml(p.last_name)} (${escapeHtml(p.title)})`).join(" • ");
+                const importBtn = c.already_imported
+                    ? `<button class="btn btn-secondary btn-sm" disabled>✅ Already in CRM</button>`
+                    : `<button class="btn btn-primary btn-sm" onclick="importCompany('${escapeHtml(c.name)}')">📥 Import Account & Decision Makers</button>`;
+
+                return `
+                    <div class="company-card">
+                        <div>
+                            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+                                <div>
+                                    <h3 style="font-size:17px;color:#0f172a;">${escapeHtml(c.name)}</h3>
+                                    <div style="font-size:12.5px;color:#64748b;">${escapeHtml(c.domain)} • ${escapeHtml(c.industry)}</div>
+                                </div>
+                                <span class="badge badge-approved">ICP Score: ${c.priority_score}/100</span>
+                            </div>
+
+                            <div style="display:flex;gap:14px;flex-wrap:wrap;margin:12px 0;font-size:12.5px;color:#475569;">
+                                <span>📍 ${escapeHtml(c.location)}</span>
+                                <span>👥 ${escapeHtml(c.size)}</span>
+                                <span>💰 ${escapeHtml(c.revenue_range)}</span>
+                            </div>
+
+                            <div style="margin-bottom:12px;">${techPills}</div>
+
+                            <div class="signal-box">
+                                <strong>⚡ Growth Signal:</strong> ${escapeHtml(c.hiring_signal)}
+                            </div>
+                        </div>
+
+                        <div style="border-top:1px solid #f1f5f9;padding-top:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+                            <div style="font-size:12px;color:#64748b;max-width:65%;">
+                                <strong>Contacts:</strong> ${contacts}
+                            </div>
+                            ${importBtn}
+                        </div>
+                    </div>
+                `;
+            }).join("");
+        }
+
+        async function importCompany(name) {
+            try {
+                const res = await fetch("/api/discovery/import", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(data.message);
+                    loadDiscovery();
+                } else {
+                    showToast("Failed to import account", true);
+                }
+            } catch (err) {
+                showToast("Network error while importing account", true);
+            }
+        }
+
+        document.getElementById("filter-industry").addEventListener("change", loadDiscovery);
+        document.getElementById("filter-size").addEventListener("change", loadDiscovery);
+        document.getElementById("filter-query").addEventListener("keydown", e => { if (e.key === "Enter") loadDiscovery(); });
+
+        loadDiscovery();
+    </script>
+</body>
+</html>

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales Copilot & Prospect Dossiers — LeadPulse AI</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <aside id="sidebar" class="sidebar"></aside>
+
+    <div class="main-wrapper">
+        <header class="topbar">
+            <div class="topbar-left">
+                <h2>Sales Copilot & Prospect Dossiers</h2>
+                <p>AI-generated 360° account briefs, discovery talking points, objection playbooks & Next Best Actions</p>
+            </div>
+            <div class="topbar-right">
+                <a href="/sequences" class="btn btn-secondary">✉️ Approval Queue</a>
+            </div>
+        </header>
+
+        <main class="content">
+            <section class="card">
+                <div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;">
+                    <div class="form-group" style="flex:1;min-width:280px;margin-bottom:0;">
+                        <label class="form-label">Select Target Prospect for AI Briefing Dossier</label>
+                        <select id="copilot-lead-select" class="form-control" onchange="loadDossier()"></select>
+                    </div>
+                    <button class="btn btn-primary" onclick="loadDossier()">🤖 Refresh AI Dossier</button>
+                </div>
+            </section>
+
+            <div id="dossier-container">
+                <div class="card"><p style="color:#64748b;">Loading prospect dossier...</p></div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/js/common.js"></script>
+    <script>
+        renderSidebar("/copilot");
+
+        async function initCopilot() {
+            const res = await fetch("/api/crm/leads");
+            const data = await res.json();
+            const sel = document.getElementById("copilot-lead-select");
+
+            sel.innerHTML = data.leads.map(l =>
+                `<option value="${l.id}">${escapeHtml(l.first_name)} ${escapeHtml(l.last_name)} — ${escapeHtml(l.title)} (${escapeHtml(l.company_name || "")})</option>`
+            ).join("");
+
+            const params = new URLSearchParams(window.location.search);
+            const preselect = params.get("lead_id");
+            if (preselect && data.leads.some(l => String(l.id) === preselect)) {
+                sel.value = preselect;
+            }
+
+            if (data.leads.length) loadDossier();
+        }
+
+        async function loadDossier() {
+            const leadId = document.getElementById("copilot-lead-select").value;
+            if (!leadId) return;
+
+            const res = await fetch(`/api/copilot/dossier/${leadId}`);
+            const d = await res.json();
+            const l = d.lead;
+            const c = d.company;
+            const ai = d.ai_dossier;
+
+            const techPills = (c.tech_stack || "").split(",").map(t => `<span class="tech-pill">${escapeHtml(t.trim())}</span>`).join("");
+
+            document.getElementById("dossier-container").innerHTML = `
+                <section class="hero-banner">
+                    <div>
+                        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
+                            <h1 style="margin:0;">${escapeHtml(l.first_name)} ${escapeHtml(l.last_name)}</h1>
+                            ${tempBadge(l.temperature)}
+                            ${statusBadge(l.status)}
+                        </div>
+                        <p>${escapeHtml(l.title)} at <strong>${escapeHtml(c.name)}</strong> (${escapeHtml(c.industry)}) • ${escapeHtml(l.email)}</p>
+                    </div>
+                    <div style="display:flex;gap:14px;flex-wrap:wrap;">
+                        <div style="background:rgba(255,255,255,0.12);padding:12px 18px;border-radius:12px;text-align:center;">
+                            <div style="font-size:11px;color:#cbd5e1;text-transform:uppercase;">ICP Score</div>
+                            <div style="font-size:24px;font-weight:800;">${l.lead_score}/100</div>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.12);padding:12px 18px;border-radius:12px;text-align:center;">
+                            <div style="font-size:11px;color:#cbd5e1;text-transform:uppercase;">BANT Score</div>
+                            <div style="font-size:24px;font-weight:800;">${l.bant_score}/100</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="grid-split">
+                    <div>
+                        <div class="card">
+                            <div class="card-header"><div class="card-title">📋 Executive Summary & Account Context</div></div>
+                            <p style="font-size:14px;color:#334155;line-height:1.7;">${escapeHtml(ai.prospect_summary)}</p>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header"><div class="card-title">🎯 Recommended Discovery Talking Points</div></div>
+                            <ul style="padding-left:18px;display:flex;flex-direction:column;gap:10px;font-size:13.5px;color:#334155;">
+                                ${ai.talking_points.map(tp => `<li>${escapeHtml(tp)}</li>`).join("")}
+                            </ul>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header"><div class="card-title">🛡️ Objection Handling Playbook</div></div>
+                            <div style="display:flex;flex-direction:column;gap:12px;">
+                                ${ai.objections_playbook.map(o => `
+                                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;">
+                                        <div style="font-weight:700;color:#b91c1c;font-size:13px;margin-bottom:4px;">Objection: ${escapeHtml(o.objection)}</div>
+                                        <div style="font-size:13px;color:#334155;"><strong>Recommended Counter:</strong> ${escapeHtml(o.counter)}</div>
+                                    </div>
+                                `).join("")}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="card">
+                            <div class="card-header"><div class="card-title">⚡ Next Best Actions (NBA)</div></div>
+                            <div style="display:flex;flex-direction:column;gap:10px;">
+                                ${ai.next_best_actions.map((nba, i) => `
+                                    <label style="display:flex;gap:10px;align-items:flex-start;padding:11px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;font-size:13px;cursor:pointer;">
+                                        <input type="checkbox" style="margin-top:3px;">
+                                        <span>${escapeHtml(nba)}</span>
+                                    </label>
+                                `).join("")}
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header"><div class="card-title">🏢 Firmographic Intelligence</div></div>
+                            <div style="display:flex;flex-direction:column;gap:9px;font-size:13px;color:#334155;">
+                                <div><strong>Domain:</strong> <span class="mono">${escapeHtml(c.domain)}</span></div>
+                                <div><strong>Headcount:</strong> ${escapeHtml(c.size)}</div>
+                                <div><strong>Location:</strong> ${escapeHtml(c.location)}</div>
+                                <div><strong>Revenue:</strong> ${escapeHtml(c.revenue_range)}</div>
+                                <div><strong>Tech Stack:</strong><div style="margin-top:4px;">${techPills}</div></div>
+                                <div class="signal-box" style="margin-top:6px;"><strong>Signal:</strong> ${escapeHtml(c.hiring_signal)}</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            `;
+        }
+
+        initCopilot();
+    </script>
+</body>
+</html>
